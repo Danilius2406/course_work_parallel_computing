@@ -29,7 +29,7 @@ public class Client {
                 System.out.println("3. Exit");
                 System.out.print("Choice: ");
                 int choice = scanner.nextInt();
-                scanner.nextLine(); // Consume newline
+                scanner.nextLine();
 
                 if (choice == 1) {
                     System.out.print("Enter document ID: ");

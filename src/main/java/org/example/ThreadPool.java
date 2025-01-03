@@ -2,6 +2,7 @@ package org.example;
 
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.Executor;
 
 public class ThreadPool {
     private final Queue<Runnable> taskQueue;
@@ -33,6 +34,14 @@ public class ThreadPool {
         for (WorkerThread worker : workerThreads) {
             worker.stopWorker();
         }
+    }
+
+    public void execute(Runnable task) {
+        submitTask(task);
+    }
+
+    public Executor asExecutor() {
+        return this::execute;
     }
 
     private static class WorkerThread extends Thread {

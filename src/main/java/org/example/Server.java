@@ -1,6 +1,11 @@
 package org.example;
 
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpExchange;
+
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
@@ -23,19 +28,37 @@ public class Server {
             invertedIndex.loadDocumentsFromDirectory(datasetPath);
             System.out.println("[SERVER] Initial dataset loaded.");
 
-            try (ServerSocket serverSocket = new ServerSocket(port)) {
-                System.out.println("[SERVER] Server started on port " + port);
+            new Thread(this::startTcpServer).start();
 
-                while (true) {
-                    Socket clientSocket = serverSocket.accept();
-                    System.out.println("[SERVER] New client connected: " + clientSocket.getRemoteSocketAddress());
-                    threadPool.submitTask(() -> handleClient(clientSocket));
-                }
-            }
+            startHttpServer();
+
         } catch (IOException e) {
             System.err.println("[SERVER] Error starting the server: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private void startTcpServer() {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("[SERVER] TCP Server started on port " + port);
+
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("[SERVER] New TCP client connected: " + clientSocket.getRemoteSocketAddress());
+                threadPool.submitTask(() -> handleClient(clientSocket));
+            }
+        } catch (IOException e) {
+            System.err.println("[SERVER] Error starting TCP server: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void startHttpServer() throws IOException {
+        HttpServer httpServer = HttpServer.create(new InetSocketAddress(port + 1), 0);
+        httpServer.createContext("/search", new HttpSearchHandler());
+        httpServer.setExecutor(threadPool.asExecutor());
+        httpServer.start();
+        System.out.println("[SERVER] HTTP Server started on port " + (port + 1));
     }
 
     private void handleClient(Socket clientSocket) {
@@ -50,26 +73,22 @@ public class Server {
                     String[] parts = command.split(" ", 3);
                     if (parts.length < 3) {
                         out.println("[ERROR] Invalid ADD command format.");
-                        System.out.println("[SERVER] Invalid ADD command received.");
                         continue;
                     }
 
                     String docId = parts[1];
                     String content = parts[2];
 
-                    // Save new file to directory
                     String filePath = "C:\\Users\\Danie\\Desktop\\4 course 1 term\\ParallelComputing\\Dataset\\" + docId + ".txt";
                     Files.writeString(Paths.get(filePath), content);
 
                     invertedIndex.addDocument(docId, content);
                     out.println("[SERVER] Document added.");
-                    System.out.println("[SERVER] Document added with ID: " + docId);
 
                 } else if (command.startsWith("SEARCH")) {
                     String[] parts = command.split(" ", 2);
                     if (parts.length < 2) {
                         out.println("[ERROR] Invalid SEARCH command format.");
-                        System.out.println("[SERVER] Invalid SEARCH command received.");
                         continue;
                     }
 
@@ -77,30 +96,57 @@ public class Server {
                     Set<String> results = invertedIndex.search(word);
                     if (results.isEmpty()) {
                         out.println("[SERVER] No files found containing the word: " + word);
-                        System.out.println("[SERVER] Search result for '" + word + "': No matches found.");
                     } else {
                         out.println("[SERVER] Results: " + results);
-                        System.out.println("[SERVER] Search result for '" + word + "': " + results);
                     }
                 } else if (command.equals("EXIT")) {
                     out.println("[SERVER] Goodbye!");
-                    System.out.println("[SERVER] Client disconnected: " + clientSocket.getRemoteSocketAddress());
                     break;
                 } else {
                     out.println("[ERROR] Invalid command.");
-                    System.out.println("[SERVER] Invalid command received: " + command);
                 }
             }
         } catch (IOException e) {
             System.err.println("[SERVER] Error handling client: " + e.getMessage());
-            e.printStackTrace();
         } finally {
             try {
                 clientSocket.close();
-                System.out.println("[SERVER] Connection closed: " + clientSocket.getRemoteSocketAddress());
             } catch (IOException e) {
                 System.err.println("[SERVER] Error closing client socket: " + e.getMessage());
             }
+        }
+    }
+
+    private class HttpSearchHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            String query = exchange.getRequestURI().getQuery();
+            if (query == null || !query.startsWith("word=")) {
+                String response = "Invalid query format. Use /search?word=<word>";
+                exchange.sendResponseHeaders(400, response.length());
+                exchange.getResponseBody().write(response.getBytes());
+                exchange.getResponseBody().close();
+                return;
+            }
+
+            String word = query.substring(5);
+            Set<String> results = invertedIndex.search(word);
+
+            String response;
+            if (results.isEmpty()) {
+                response = "No files found containing the word: " + word;
+            } else {
+                response = "Results: " + results;
+            }
+
+            exchange.sendResponseHeaders(200, response.length());
+            exchange.getResponseBody().write(response.getBytes());
+            exchange.getResponseBody().close();
         }
     }
 

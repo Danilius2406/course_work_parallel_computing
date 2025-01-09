@@ -56,6 +56,7 @@ public class Server {
     private void startHttpServer() throws IOException {
         HttpServer httpServer = HttpServer.create(new InetSocketAddress(port + 1), 0);
         httpServer.createContext("/search", new HttpSearchHandler());
+        httpServer.createContext("/add", new HttpAddHandler());
         httpServer.setExecutor(threadPool.asExecutor());
         httpServer.start();
         System.out.println("[SERVER] HTTP Server started on port " + (port + 1));
@@ -117,10 +118,21 @@ public class Server {
         }
     }
 
+    private void addCORSHeaders(HttpExchange exchange) {
+        exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+    }
+
     private class HttpSearchHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            System.out.println("[HTTP] Received request: " + exchange.getRequestMethod() + " " + exchange.getRequestURI());
+
+            addCORSHeaders(exchange);
+
             if (!"GET".equals(exchange.getRequestMethod())) {
+                System.out.println("[HTTP] Method not allowed: " + exchange.getRequestMethod());
                 exchange.sendResponseHeaders(405, -1);
                 return;
             }
@@ -128,6 +140,7 @@ public class Server {
             String query = exchange.getRequestURI().getQuery();
             if (query == null || !query.startsWith("word=")) {
                 String response = "Invalid query format. Use /search?word=<word>";
+                System.out.println("[HTTP] Invalid query format.");
                 exchange.sendResponseHeaders(400, response.length());
                 exchange.getResponseBody().write(response.getBytes());
                 exchange.getResponseBody().close();
@@ -140,13 +153,76 @@ public class Server {
             String response;
             if (results.isEmpty()) {
                 response = "No files found containing the word: " + word;
+                System.out.println("[HTTP] No results for word: " + word);
             } else {
                 response = "Results: " + results;
+                System.out.println("[HTTP] Search results for word '" + word + "': " + results);
             }
 
             exchange.sendResponseHeaders(200, response.length());
             exchange.getResponseBody().write(response.getBytes());
             exchange.getResponseBody().close();
+        }
+    }
+
+    private class HttpAddHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCORSHeaders(exchange);
+
+            if (!"POST".equals(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            InputStream inputStream = exchange.getRequestBody();
+            String body = new String(inputStream.readAllBytes());
+
+            String[] pairs = body.split("&");
+            String docId = null;
+            String content = null;
+
+            for (String pair : pairs) {
+                String[] keyValue = pair.split("=");
+                if (keyValue.length == 2) {
+                    String key = java.net.URLDecoder.decode(keyValue[0], "UTF-8");
+                    String value = java.net.URLDecoder.decode(keyValue[1], "UTF-8");
+
+                    if ("docId".equals(key)) {
+                        docId = value;
+                    } else if ("content".equals(key)) {
+                        content = value;
+                    }
+                }
+            }
+
+            if (docId == null || content == null) {
+                String response = "Missing docId or content in form data.";
+                exchange.sendResponseHeaders(400, response.length());
+                exchange.getResponseBody().write(response.getBytes());
+                exchange.getResponseBody().close();
+                return;
+            }
+
+            try {
+                String filePath = "C:\\Users\\Danie\\Desktop\\4 course 1 term\\ParallelComputing\\Dataset\\" + docId + ".txt";
+                Files.writeString(Paths.get(filePath), content);
+
+                invertedIndex.addDocument(docId, content);
+
+                System.out.println("[HTTP] Document added: " + docId);
+                System.out.println("[HTTP] Content: " + content);
+
+                String response = "Document added successfully.";
+                exchange.sendResponseHeaders(200, response.length());
+                exchange.getResponseBody().write(response.getBytes());
+            } catch (IOException e) {
+                String response = "Error saving document: " + e.getMessage();
+                exchange.sendResponseHeaders(500, response.length());
+                exchange.getResponseBody().write(response.getBytes());
+            } finally {
+                exchange.getResponseBody().close();
+            }
         }
     }
 
@@ -157,7 +233,7 @@ public class Server {
 
     public static void main(String[] args) {
         String datasetPath = "C:\\Users\\Danie\\Desktop\\4 course 1 term\\ParallelComputing\\Dataset";
-        Server server = new Server(8080, 4);
+        Server server = new Server(8080, 16);
         server.start(datasetPath);
     }
 }

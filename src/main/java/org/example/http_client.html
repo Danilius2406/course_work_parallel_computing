@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Document Management</title>
+    <script>
+        function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const docId = document.getElementById("docId").value;
+            const content = document.getElementById("content").value;
+            const word = document.getElementById("searchWord").value;
+
+            if (docId && content) {
+                fetch('http://localhost:8081/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: `docId=${encodeURIComponent(docId)}&content=${encodeURIComponent(content)}`
+                })
+                .then(response => response.text())
+                .then(responseText => {
+                    alert(responseText);
+                })
+                .catch(error => alert('Error adding document: ' + error));
+            }
+
+            if (word) {
+                fetch(`http://localhost:8081/search?word=${encodeURIComponent(word)}`)
+                .then(response => response.text())
+                .then(responseText => {
+                    document.getElementById("searchResults").innerText = responseText;
+                })
+                .catch(error => alert('Error searching for word: ' + error));
+            }
+        }
+    </script>
+</head>
+<body>
+    <form onsubmit="handleFormSubmit(event)">
+        <h2>Add Document</h2>
+        <label for="docId">Document ID:</label><br>
+        <input type="text" id="docId" name="docId"><br><br>
+        <label for="content">Content:</label><br>
+        <textarea id="content" name="content"></textarea><br><br>
+        <button type="submit">Add Document</button>
+    </form>
+    
+    <form onsubmit="handleFormSubmit(event)">
+        <h2>Search Word</h2>
+        <label for="searchWord">Search Word:</label><br>
+        <input type="text" id="searchWord" name="searchWord"><br><br>
+        <button type="submit">Search</button>
+    </form>
+
+    <h2>Search Results:</h2>
+    <p id="searchResults"></p>
+</body>
+</html>

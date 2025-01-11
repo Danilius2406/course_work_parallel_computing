@@ -14,7 +14,7 @@ public class ThreadPool {
         workerThreads = new WorkerThread[numThreads];
 
         for (int i = 0; i < numThreads; i++) {
-            workerThreads[i] = new WorkerThread(taskQueue);
+            workerThreads[i] = new WorkerThread(taskQueue); //, "Потік-" + (i + 1)
             workerThreads[i].start();
         }
     }
@@ -48,8 +48,10 @@ public class ThreadPool {
         private final Queue<Runnable> taskQueue;
         private volatile boolean isStopped = false;
 
-        public WorkerThread(Queue<Runnable> taskQueue) {
+        public WorkerThread(Queue<Runnable> taskQueue) //, String name
+        {
             this.taskQueue = taskQueue;
+          //  this.setName(name); // Встановлюємо ім'я потоку
         }
 
         @Override
@@ -71,6 +73,7 @@ public class ThreadPool {
                 }
 
                 if (task != null) {
+                  // System.out.println("Потік " + this.getName() + " обробляє завдання.");
                     try {
                         task.run();
                     } catch (RuntimeException e) {

@@ -9,7 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class LoadTest {
-    private static final int NUM_CLIENTS = 100;
+    private static final int NUM_CLIENTS = 1000;
     private static final int NUM_REQUESTS_PER_CLIENT = 30;
     private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 8080;

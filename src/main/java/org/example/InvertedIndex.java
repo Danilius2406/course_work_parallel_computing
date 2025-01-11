@@ -27,18 +27,25 @@ public class InvertedIndex {
         return index.getOrDefault(word.toLowerCase(), Collections.emptySet());
     }
 
-    public void loadDocumentsFromDirectory(String directoryPath) throws IOException {
+    public void loadDocumentsFromDirectory(String directoryPath, ThreadPool threadPool) throws IOException {
+        long startTime = System.nanoTime();
+
         Files.walk(Paths.get(directoryPath))
                 .filter(Files::isRegularFile)
                 .filter(path -> path.toString().endsWith(".txt"))
                 .forEach(path -> {
-                    try {
-                        String content = Files.readString(path);
-                        addDocument(path.getFileName().toString(), content);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    threadPool.submitTask(() -> {
+                        try {
+                            String content = Files.readString(path);
+                            addDocument(path.getFileName().toString(), content);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
                 });
+
+        long endTime = System.nanoTime();
+        System.out.println("Загальний час побудови індекса: " + (endTime - startTime) / 1_000_000 + " мс");
     }
 
     public void printIndex() {

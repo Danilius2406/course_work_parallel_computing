@@ -25,11 +25,10 @@ public class Server {
 
     public void start(String datasetPath) {
         try {
-            invertedIndex.loadDocumentsFromDirectory(datasetPath);
+            invertedIndex.loadDocumentsFromDirectory(datasetPath, threadPool);
             System.out.println("[SERVER] Initial dataset loaded.");
 
             new Thread(this::startTcpServer).start();
-
             startHttpServer();
 
         } catch (IOException e) {
@@ -233,7 +232,7 @@ public class Server {
 
     public static void main(String[] args) {
         String datasetPath = "C:\\Users\\Danie\\Desktop\\4 course 1 term\\ParallelComputing\\Dataset";
-        Server server = new Server(8080, 16);
+        Server server = new Server(8080, 2);
         server.start(datasetPath);
     }
 }
